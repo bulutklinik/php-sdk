@@ -1,0 +1,49 @@
+{
+    "name": "bulutklinik/sdk",
+    "description": "Official Bulutklinik API SDK for PHP",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["bulutklinik", "sdk", "api", "telemedicine", "health", "appointments", "hbys"],
+    "homepage": "https://github.com/bulutklinik/php-sdk",
+    "support": {
+        "issues": "https://github.com/bulutklinik/php-sdk/issues"
+    },
+    "require": {
+        "php": "^8.2",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/http-message": "^1.1 || ^2.0",
+        "php-http/discovery": "^1.19"
+    },
+    "require-dev": {
+        "guzzlehttp/guzzle": "^7.8",
+        "pestphp/pest": "^2.34",
+        "phpstan/phpstan": "^1.11",
+        "friendsofphp/php-cs-fixer": "^3.59"
+    },
+    "autoload": {
+        "psr-4": {
+            "Bulutklinik\\Sdk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Bulutklinik\\Sdk\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "stan": "phpstan analyse",
+        "cs": "php-cs-fixer fix",
+        "cs:check": "php-cs-fixer fix --dry-run --diff"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

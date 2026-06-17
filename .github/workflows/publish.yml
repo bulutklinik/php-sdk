@@ -1,0 +1,33 @@
+name: Publish
+
+# Packagist hosts bulutklinik/sdk straight from the Git tags. This workflow
+# re-runs the gate on a vX.Y.Z tag and then notifies Packagist to update.
+# Requires PACKAGIST_USERNAME and PACKAGIST_TOKEN secrets (or rely on the
+# Packagist GitHub service hook, in which case the notify step is skipped).
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGIST_USERNAME: ${{ secrets.PACKAGIST_USERNAME }}
+      PACKAGIST_TOKEN: ${{ secrets.PACKAGIST_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - run: composer validate --strict
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer cs:check
+      - run: composer stan
+      - run: composer test
+      - name: Notify Packagist
+        if: env.PACKAGIST_TOKEN != ''
+        run: |
+          curl -sf -X POST -H 'content-type:application/json' \
+            "https://packagist.org/api/update-package?username=${PACKAGIST_USERNAME}&apiToken=${PACKAGIST_TOKEN}" \
+            -d '{"repository":{"url":"https://github.com/bulutklinik/php-sdk"}}'
