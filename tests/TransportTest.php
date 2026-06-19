@@ -28,6 +28,35 @@ it('unwraps data on success and sends bearer + lang headers', function () {
         ->toBe(['searchText' => 'kardiyo', 'listType' => null, 'location' => null]);
 });
 
+it('request() escape hatch calls an arbitrary path with a bearer token', function () {
+    [$client, $mock] = makeClient(
+        fn () => jsonResponse(['resultType' => 0, 'data' => ['ok' => true]]),
+        new InMemoryTokenStore('abc'),
+    );
+
+    $res = $client->request('GET', '/patients/customEndpoint');
+
+    expect($res)->toBe(['ok' => true]);
+    $req = $mock->requests[0];
+    expect((string) $req->getUri())->toBe('https://apitest.bulutklinik.com/api/v3/patients/customEndpoint');
+    expect($req->getMethod())->toBe('GET');
+    expect($req->getHeaderLine('Authorization'))->toBe('Bearer abc');
+});
+
+it('request() escape hatch sends a public POST body and unwraps data', function () {
+    [$client, $mock] = makeClient(
+        fn () => jsonResponse(['resultType' => 0, 'data' => ['id' => 7]]),
+    );
+
+    $res = $client->request('POST', '/general/somePublicEndpoint', 'public', ['foo' => 'bar']);
+
+    expect($res)->toBe(['id' => 7]);
+    $req = $mock->requests[0];
+    expect($req->getMethod())->toBe('POST');
+    expect($req->getHeaderLine('Authorization'))->toBe('');
+    expect(json_decode((string) $req->getBody(), true))->toBe(['foo' => 'bar']);
+});
+
 it('maps 422 to ValidationException', function () {
     [$client] = makeClient(
         fn () => jsonResponse(['resultType' => 1, 'errorType' => 'validation', 'errorMessage' => 'bad'], 422),

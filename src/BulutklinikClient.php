@@ -51,4 +51,27 @@ final class BulutklinikClient
         $this->payments = new PaymentsResource($this->http);
         $this->measures = new MeasuresResource($this->http);
     }
+
+    /**
+     * Escape hatch: call any Bulutklinik API endpoint that does not yet have a
+     * typed resource method. The request goes through the same shared transport
+     * as the resource methods, so default headers, the chosen `$auth` mode
+     * (`bearer` by default), silent token refresh + retry, envelope unwrapping
+     * and the typed error hierarchy all still apply. Returns the unwrapped
+     * `data` payload. Prefer a typed resource method when one exists.
+     *
+     * @param string                     $method `GET` | `POST` | `PUT` | `DELETE`
+     * @param string                     $path   relative to the base URL, e.g. `/patients/allBranches`
+     * @param string                     $auth   `public` | `bearer` | `partner` (default `bearer`)
+     * @param array<string, mixed>|null  $body   optional JSON payload (omitted on `GET`)
+     * @param string|null                $lang   optional per-request `lang` override
+     *
+     * @example
+     * $branches = $client->request('GET', '/patients/allBranches');
+     * $created = $client->request('POST', '/patients/someNewEndpoint', 'bearer', ['foo' => 'bar']);
+     */
+    public function request(string $method, string $path, string $auth = 'bearer', ?array $body = null, ?string $lang = null): mixed
+    {
+        return $this->http->request($method, $path, $auth, $body, $lang);
+    }
 }
