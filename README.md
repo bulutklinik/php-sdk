@@ -64,6 +64,8 @@ $client->appointments->reserveInterview($doctorId, '2026-06-20 14:30');
 | `$client->appointments` | `reserveInterview`, `addPhysical`, `cancel` |
 | `$client->payments`     | `checkDiscountCode`, `getCards`, `saveCard`, `pay`, `deleteCard` |
 | `$client->measures`     | `addList`, `add`, `update`, `delete`, `last`, `list`, `graph`, `partnerHealthInformation` |
+| `$client->skin`         | `analyze` |
+| `$client->meals`        | `analyze` |
 
 ## Authentication & tokens
 
@@ -95,6 +97,27 @@ $client->measures->graph('tension', 2, 1); // period 2 = weekly
 > The partner endpoint (`partnerHealthInformation`) uses a `partnerToken` from
 > `ClientConfig`. The API currently matches the patient by `phoneNumber`; send
 > both `identity` and `phoneNumber` for forward compatibility.
+
+## AI image analysis
+
+```php
+// "Cildimde Neyim Var" — analyze one or more skin photos (base64)
+$result = $client->skin->analyze([['image' => $base64Jpeg, 'branch_id' => 42]]);
+foreach ($result['status'] as $s) {
+    echo $s['label'], $s['comment'], PHP_EOL;
+    // $s['case_detail'] can be forwarded verbatim as a payment's caseDetail
+}
+
+// Meal photo → calorie/nutrition estimate
+$meal = $client->meals->analyze(
+    image: $base64Jpeg,
+    portionSize: 'medium', // small | medium | large | custom
+    mealType: 'lunch',     // breakfast | lunch | dinner | snack
+    // portionGrams: 300,  // required when portionSize is 'custom'
+    // note: 'az yağlı',
+);
+echo $meal['status']['comment'];
+```
 
 ## Errors
 

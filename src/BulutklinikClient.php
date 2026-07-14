@@ -8,8 +8,10 @@ use Bulutklinik\Sdk\Http\HttpClient;
 use Bulutklinik\Sdk\Resource\AppointmentsResource;
 use Bulutklinik\Sdk\Resource\AuthResource;
 use Bulutklinik\Sdk\Resource\DoctorsResource;
+use Bulutklinik\Sdk\Resource\MealsResource;
 use Bulutklinik\Sdk\Resource\MeasuresResource;
 use Bulutklinik\Sdk\Resource\PaymentsResource;
+use Bulutklinik\Sdk\Resource\SkinResource;
 use Bulutklinik\Sdk\Resource\SlotsResource;
 use Bulutklinik\Sdk\Token\TokenStore;
 
@@ -34,6 +36,8 @@ final class BulutklinikClient
     public readonly AppointmentsResource $appointments;
     public readonly PaymentsResource $payments;
     public readonly MeasuresResource $measures;
+    public readonly SkinResource $skin;
+    public readonly MealsResource $meals;
     public readonly TokenStore $tokenStore;
 
     private readonly HttpClient $http;
@@ -50,6 +54,8 @@ final class BulutklinikClient
         $this->appointments = new AppointmentsResource($this->http);
         $this->payments = new PaymentsResource($this->http);
         $this->measures = new MeasuresResource($this->http);
+        $this->skin = new SkinResource($this->http);
+        $this->meals = new MealsResource($this->http);
     }
 
     /**
