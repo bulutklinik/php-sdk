@@ -58,7 +58,7 @@ $client->appointments->reserveInterview($doctorId, '2026-06-20 14:30');
 
 | Group                  | Methods |
 |------------------------|---------|
-| `$client->auth`         | `connect`, `connectWithTwoFactor`, `register`, `refresh`, `disconnect` |
+| `$client->auth`         | `connect`, `connectWithTwoFactor`, `verifyRegistration`, `register`, `refresh`, `disconnect` |
 | `$client->doctors`      | `branches`, `locations`, `quickSearch`, `search`, `detail` |
 | `$client->slots`        | `schedule` |
 | `$client->appointments` | `reserveInterview`, `addPhysical`, `cancel` |

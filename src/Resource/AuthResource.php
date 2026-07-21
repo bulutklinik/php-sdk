@@ -48,6 +48,51 @@ final class AuthResource extends AbstractResource
         $this->storeTokens($data);
     }
 
+    /**
+     * Step 1 of registration: send the SMS/e-mail verification code and return the
+     * encrypted `response` blob. Uses the configured **partner** token (the endpoint
+     * is behind `auth:apiusers`, not public). A CAPTCHA token (`$recaptchaV2` or
+     * `$captcha`), minted by a browser/human, is required by the server. Feed the
+     * returned `response` (and the code the user receives) into {@see register()}.
+     *
+     * @param list<mixed>|null $userAgreements
+     * @return array{response: string, confirmationType: string}|array<string, mixed>
+     */
+    public function verifyRegistration(
+        string $name,
+        string $surname,
+        string $phoneNumber,
+        string $phoneCode,
+        string $email,
+        string $password,
+        int $acceptUserAgreement = 1,
+        ?string $recaptchaV2 = null,
+        ?string $captcha = null,
+        ?array $userAgreements = null,
+    ): array {
+        $body = [
+            'name' => $name,
+            'surname' => $surname,
+            'phoneNumber' => $phoneNumber,
+            'phone_code' => $phoneCode,
+            'email' => $email,
+            'password' => $password,
+            'passwordAgain' => $password,
+            'acceptUserAgreement' => $acceptUserAgreement,
+        ];
+        if ($recaptchaV2 !== null) {
+            $body['g-recaptcha-response-v2'] = $recaptchaV2;
+        }
+        if ($captcha !== null) {
+            $body['captcha'] = $captcha;
+        }
+        if ($userAgreements !== null) {
+            $body['userAgreements'] = $userAgreements;
+        }
+
+        return $this->http->request('POST', '/patients/verifyAddingNewPatient', 'partner', $body);
+    }
+
     /** Register a new patient (afterRegister auto-login). Stores tokens on success. */
     public function register(
         string $name,
