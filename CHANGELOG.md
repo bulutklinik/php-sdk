@@ -4,6 +4,20 @@ All notable changes to `bulutklinik/sdk` are documented here. The format is base
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0]
+
+### Added
+
+- `$client->laboratory` — the patient's lab results, the orderable test catalog, and
+  test pre-ordering: `results($page = null)` (`GET /patients/userLabTestList/{page?}`),
+  `resultDetail($testId)` (`GET /patients/userLabTestDetail/{testId}`, string id),
+  `catalog()` (`GET /patients/allLaboratoryTests`),
+  `catalogDetail($id)` (`GET /patients/laboratoryTestDetail/{id}`) and
+  `order($testId, $addressId, $laboratoryId)` (`POST /patients/addNewLaboratoryTest`).
+- `$client->diets` — the patient's dietitian-written diet lists:
+  `list($page = null)` (`GET /patients/dietLists/{page?}`) and
+  `detail($listId)` (`GET /patients/diet/{listId}`).
+
 ## [0.3.0]
 
 ### Added

@@ -66,6 +66,8 @@ $client->appointments->reserveInterview($doctorId, '2026-06-20 14:30');
 | `$client->measures`     | `addList`, `add`, `update`, `delete`, `last`, `list`, `graph`, `partnerHealthInformation` |
 | `$client->skin`         | `analyze` |
 | `$client->meals`        | `analyze` |
+| `$client->laboratory`   | `results`, `resultDetail`, `catalog`, `catalogDetail`, `order` |
+| `$client->diets`        | `list`, `detail` |
 
 ## Authentication & tokens
 

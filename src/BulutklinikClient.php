@@ -7,7 +7,9 @@ namespace Bulutklinik\Sdk;
 use Bulutklinik\Sdk\Http\HttpClient;
 use Bulutklinik\Sdk\Resource\AppointmentsResource;
 use Bulutklinik\Sdk\Resource\AuthResource;
+use Bulutklinik\Sdk\Resource\DietsResource;
 use Bulutklinik\Sdk\Resource\DoctorsResource;
+use Bulutklinik\Sdk\Resource\LaboratoryResource;
 use Bulutklinik\Sdk\Resource\MealsResource;
 use Bulutklinik\Sdk\Resource\MeasuresResource;
 use Bulutklinik\Sdk\Resource\PaymentsResource;
@@ -38,6 +40,8 @@ final class BulutklinikClient
     public readonly MeasuresResource $measures;
     public readonly SkinResource $skin;
     public readonly MealsResource $meals;
+    public readonly LaboratoryResource $laboratory;
+    public readonly DietsResource $diets;
     public readonly TokenStore $tokenStore;
 
     private readonly HttpClient $http;
@@ -56,6 +60,8 @@ final class BulutklinikClient
         $this->measures = new MeasuresResource($this->http);
         $this->skin = new SkinResource($this->http);
         $this->meals = new MealsResource($this->http);
+        $this->laboratory = new LaboratoryResource($this->http);
+        $this->diets = new DietsResource($this->http);
     }
 
     /**
