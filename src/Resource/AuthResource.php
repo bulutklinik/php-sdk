@@ -93,6 +93,31 @@ final class AuthResource extends AbstractResource
         return $this->http->request('POST', '/patients/verifyAddingNewPatient', 'partner', $body);
     }
 
+    /**
+     * Step 2 of e-mail-branch registration. When {@see verifyRegistration()} returns
+     * confirmationType "email", confirm the e-mailed code here with the same
+     * `response` blob. The server verifies it, sends an SMS code, and returns a fresh
+     * `response` blob — feed that + the SMS code into {@see register()}. Public.
+     *
+     * @param list<mixed>|null $userAgreements
+     * @return array{response: string, confirmationType: string}|array<string, mixed>
+     */
+    public function confirmRegistrationEmail(
+        string $verificationCode,
+        string $response,
+        ?array $userAgreements = null,
+    ): array {
+        $body = [
+            'verificationCode' => $verificationCode,
+            'response' => $response,
+        ];
+        if ($userAgreements !== null) {
+            $body['userAgreements'] = $userAgreements;
+        }
+
+        return $this->http->request('POST', '/patients/emailConfirmationRegister', 'public', $body);
+    }
+
     /** Register a new patient (afterRegister auto-login). Stores tokens on success. */
     public function register(
         string $name,
@@ -119,6 +144,112 @@ final class AuthResource extends AbstractResource
             'apiSecretKey' => $clientSecret ?? $this->http->clientSecret,
         ]);
         $this->storeTokens($data);
+    }
+
+    /**
+     * Step 1 of social sign-up. Sends the SMS code and returns a `response` blob.
+     * Public — no CAPTCHA and no partner token. Feed `response` + the SMS code into
+     * {@see registerSocial()}.
+     *
+     * @param list<mixed>|null $userAgreements
+     * @return array{response: string}|array<string, mixed>
+     */
+    public function verifyRegistrationSocial(
+        string $name,
+        string $surname,
+        string $phoneNumber,
+        string $password,
+        string $socialType,
+        string $key,
+        ?string $email = null,
+        int $acceptUserAgreement = 1,
+        ?array $userAgreements = null,
+    ): array {
+        $body = [
+            'name' => $name,
+            'surname' => $surname,
+            'phoneNumber' => $phoneNumber,
+            'password' => $password,
+            'passwordAgain' => $password,
+            'socialType' => $socialType,
+            'key' => $key,
+            'acceptUserAgreement' => $acceptUserAgreement,
+        ];
+        if ($email !== null) {
+            $body['email'] = $email;
+        }
+        if ($userAgreements !== null) {
+            $body['userAgreements'] = $userAgreements;
+        }
+
+        return $this->http->request('POST', '/patients/verifyAddingNewPatientSocial', 'public', $body);
+    }
+
+    /**
+     * Step 2 of social sign-up: create the social patient. Does NOT auto-login;
+     * call {@see connect()} with loginMode "social" afterwards. Public.
+     *
+     * @param list<mixed>|null $userAgreements
+     */
+    public function registerSocial(
+        string $smsVerificationCode,
+        string $response,
+        ?array $userAgreements = null,
+    ): void {
+        $body = [
+            'smsVerificationCode' => $smsVerificationCode,
+            'response' => $response,
+        ];
+        if ($userAgreements !== null) {
+            $body['userAgreements'] = $userAgreements;
+        }
+
+        $this->http->request('POST', '/patients/addNewPatientWithSocial', 'public', $body);
+    }
+
+    /**
+     * Step 1 of password reset: send the SMS confirm code to a registered phone and
+     * return a `response` blob. A CAPTCHA token (`$recaptchaV2` or `$captcha`) is
+     * required outside the local environment. Feed `response` + the SMS code into
+     * {@see resetPassword()}.
+     *
+     * @return array{response: string}|array<string, mixed>
+     */
+    public function forgotPassword(
+        string $phoneNumber,
+        ?string $birthdate = null,
+        ?string $recaptchaV2 = null,
+        ?string $captcha = null,
+    ): array {
+        $body = ['phoneNumber' => $phoneNumber];
+        if ($birthdate !== null) {
+            $body['birthdate'] = $birthdate;
+        }
+        if ($recaptchaV2 !== null) {
+            $body['g-recaptcha-response-v2'] = $recaptchaV2;
+        }
+        if ($captcha !== null) {
+            $body['captcha'] = $captcha;
+        }
+
+        return $this->http->request('POST', '/patients/forgotPassword', 'public', $body);
+    }
+
+    /**
+     * Step 2 of password reset: set the new password using the SMS confirm code and
+     * the `response` blob from {@see forgotPassword()}. Public.
+     */
+    public function resetPassword(
+        string $smsConfirmCode,
+        string $response,
+        string $password,
+    ): void {
+        $this->http->request('PUT', '/patients/forgotPassword', 'public', [
+            'smsConfirmCode' => $smsConfirmCode,
+            'response' => $response,
+            'password' => $password,
+            'passwordAgain' => $password,
+        ]);
     }
 
     /** Manually refresh the access token using the stored refresh token. */

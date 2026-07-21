@@ -58,16 +58,17 @@ $client->appointments->reserveInterview($doctorId, '2026-06-20 14:30');
 
 | Group                  | Methods |
 |------------------------|---------|
-| `$client->auth`         | `connect`, `connectWithTwoFactor`, `verifyRegistration`, `register`, `refresh`, `disconnect` |
+| `$client->auth`         | `connect`, `connectWithTwoFactor`, `verifyRegistration`, `confirmRegistrationEmail`, `register`, `verifyRegistrationSocial`, `registerSocial`, `forgotPassword`, `resetPassword`, `refresh`, `disconnect` |
 | `$client->doctors`      | `branches`, `locations`, `quickSearch`, `search`, `detail` |
 | `$client->slots`        | `schedule` |
-| `$client->appointments` | `reserveInterview`, `addPhysical`, `cancel` |
+| `$client->appointments` | `reserveInterview`, `addPhysical`, `cancel`, `list`, `reservations` |
 | `$client->payments`     | `checkDiscountCode`, `getCards`, `saveCard`, `pay`, `deleteCard` |
 | `$client->measures`     | `addList`, `add`, `update`, `delete`, `last`, `list`, `graph`, `partnerHealthInformation` |
 | `$client->skin`         | `analyze` |
 | `$client->meals`        | `analyze` |
 | `$client->laboratory`   | `results`, `resultDetail`, `catalog`, `catalogDetail`, `order` |
 | `$client->diets`        | `list`, `detail` |
+| `$client->addresses`    | `list`, `add`, `update`, `delete` |
 
 ## Authentication & tokens
 
