@@ -13,6 +13,7 @@ use Bulutklinik\Sdk\Resource\DoctorsResource;
 use Bulutklinik\Sdk\Resource\LaboratoryResource;
 use Bulutklinik\Sdk\Resource\MealsResource;
 use Bulutklinik\Sdk\Resource\MeasuresResource;
+use Bulutklinik\Sdk\Resource\Partner\PartnerNamespace;
 use Bulutklinik\Sdk\Resource\PaymentsResource;
 use Bulutklinik\Sdk\Resource\SkinResource;
 use Bulutklinik\Sdk\Resource\SlotsResource;
@@ -44,6 +45,12 @@ final class BulutklinikClient
     public readonly LaboratoryResource $laboratory;
     public readonly DietsResource $diets;
     public readonly AddressesResource $addresses;
+    /**
+     * The company-scoped partner surface (`/outher`). Uses the configured
+     * `partnerToken` instead of a patient login; data is limited to your own
+     * company and the patient is named inline on each call.
+     */
+    public readonly PartnerNamespace $partner;
     public readonly TokenStore $tokenStore;
 
     private readonly HttpClient $http;
@@ -65,6 +72,7 @@ final class BulutklinikClient
         $this->laboratory = new LaboratoryResource($this->http);
         $this->diets = new DietsResource($this->http);
         $this->addresses = new AddressesResource($this->http);
+        $this->partner = new PartnerNamespace($this->http);
     }
 
     /**
