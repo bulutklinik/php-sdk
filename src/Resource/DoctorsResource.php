@@ -16,7 +16,11 @@ final class DoctorsResource extends AbstractResource
     /**
      * Filtered doctor search.
      *
-     * @param array<string, mixed> $searchParams
+     * `$searchParams` must carry at least one key: the server rule is
+     * `required|array` and PHP's `required` rejects an empty array, so `[]` is a
+     * validation error rather than an unfiltered search.
+     *
+     * @param array<string, mixed> $searchParams non-empty
      * @param list<string>         $orderParams  any of `name`, `order`, `slot`
      */
     public function search(array $searchParams, int $currentPage = 1, array $orderParams = []): mixed
