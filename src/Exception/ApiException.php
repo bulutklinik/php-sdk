@@ -23,12 +23,12 @@ class ApiException extends BulutklinikException
             return new AuthenticationException($message, $context);
         }
 
-        // `resultType 4` used to trigger a silent refresh. On the partner surface
-        // there is nothing to refresh, so say what the caller actually has to do.
+        // `resultType 4` reaches here only when the silent refresh could not run
+        // or failed — the transport retries first (DESIGN.md §5.4).
         if ($context->resultType === 4) {
             return new AuthenticationException(
-                $message . ' The partner token is expired or invalid — install a newly issued token;'
-                . ' the SDK cannot refresh it.',
+                $message . ' The access token is expired and could not be refreshed —'
+                . ' call auth->connect() again.',
                 $context,
             );
         }

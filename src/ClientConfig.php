@@ -15,6 +15,9 @@ use Psr\Http\Message\StreamFactoryInterface;
  * factories) are optional and auto-discovered via php-http/discovery when null.
  * Request timeouts are a property of the injected PSR-18 client.
  *
+ * `$clientId` / `$clientSecret` come from your portal application and are used by
+ * `auth->connect()` and the silent refresh.
+ *
  * Pass `$partnerToken` **or** `$tokenStore`, not both — either the literal or the
  * store is the source of truth for the credential, and guessing which one the
  * caller meant is how credential bugs get shipped.
@@ -26,6 +29,8 @@ final class ClientConfig
         public readonly ApiVersion $apiVersion = ApiVersion::V3,
         public readonly ?string $baseUrl = null,
         public readonly string $lang = 'tr',
+        public readonly ?string $clientId = null,
+        public readonly ?string $clientSecret = null,
         public readonly ?string $partnerToken = null,
         public readonly ?TokenStore $tokenStore = null,
         public readonly ?ClientInterface $httpClient = null,

@@ -6,6 +6,7 @@ namespace Bulutklinik\Sdk;
 
 use Bulutklinik\Sdk\Http\HttpClient;
 use Bulutklinik\Sdk\Resource\AppointmentsResource;
+use Bulutklinik\Sdk\Resource\AuthResource;
 use Bulutklinik\Sdk\Resource\DietsResource;
 use Bulutklinik\Sdk\Resource\DoctorsResource;
 use Bulutklinik\Sdk\Resource\LaboratoryResource;
@@ -17,21 +18,26 @@ use Bulutklinik\Sdk\Token\TokenStore;
  * The Bulutklinik partner API client. Construct once and reuse; service groups
  * are exposed as readonly properties.
  *
- * Every call runs on the company-scoped `/outher` surface with the partner token
- * issued for your integration: you act on the patients of **your own company**,
- * and the patient is named inline on each request — there is no login and no
- * session.
+ * Every data call runs on the company-scoped `/outher` surface: you act on the
+ * patients of **your own company**, and the patient is named inline on each
+ * request — there is no patient session.
  *
  * @example
  * $client = new BulutklinikClient(new ClientConfig(
  *     environment: Environment::Test,
- *     partnerToken: getenv('BK_PARTNER_TOKEN') ?: null,
+ *     clientId: getenv('BK_CLIENT_ID') ?: null,
+ *     clientSecret: getenv('BK_CLIENT_SECRET') ?: null,
  * ));
+ * $client->auth->connect('svc@your-app.bulutklinik', 'your-portal-password');
  * $branches = $client->doctors->branches();
  * $latest = $client->measures->last(['identityNumber' => '12345678901']);
+ *
+ * Already holding a token? Pass `partnerToken` and skip `auth->connect()`.
  */
 final class BulutklinikClient
 {
+    /** Obtain, refresh and revoke the access token. */
+    public readonly AuthResource $auth;
     /** Doctor discovery: search, branches, detail, city list. */
     public readonly DoctorsResource $doctors;
     /** Doctor availability (materialized slots). */
@@ -58,6 +64,7 @@ final class BulutklinikClient
         $this->http = new HttpClient($config);
         $this->tokenStore = $this->http->tokenStore;
 
+        $this->auth = new AuthResource($this->http);
         $this->doctors = new DoctorsResource($this->http);
         $this->slots = new SlotsResource($this->http);
         $this->appointments = new AppointmentsResource($this->http);

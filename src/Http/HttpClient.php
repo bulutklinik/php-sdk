@@ -9,6 +9,7 @@ use Bulutklinik\Sdk\Exception\ApiErrorContext;
 use Bulutklinik\Sdk\Exception\ApiException;
 use Bulutklinik\Sdk\Exception\AuthenticationException;
 use Bulutklinik\Sdk\Exception\TransportException;
+use Bulutklinik\Sdk\Token\RefreshTokenStore;
 use Bulutklinik\Sdk\Token\TokenStore;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Http\Discovery\Psr18ClientDiscovery;
@@ -22,16 +23,19 @@ use Psr\Http\Message\StreamFactoryInterface;
  * Low-level transport: builds PSR-7 requests, unwraps the response envelope and
  * maps failures to typed exceptions.
  *
- * There is no silent refresh: a partner token is issued out of band and cannot
- * be renewed from here, so an expired one (`401` / `resultType 4`) surfaces as an
- * `AuthenticationException` instead of being retried.
+ * On a `401` / `resultType 4` it refreshes once and retries the original request;
+ * the error surfaces only when there is no refresh token or the refresh fails.
  */
 final class HttpClient
 {
     public readonly TokenStore $tokenStore;
+    public readonly ?string $clientId;
+    public readonly ?string $clientSecret;
 
     private readonly string $baseUrl;
     private readonly string $lang;
+    /** Used only when the injected store cannot persist the refresh token. */
+    private ?string $fallbackRefreshToken = null;
     private readonly ClientInterface $httpClient;
     private readonly RequestFactoryInterface $requestFactory;
     private readonly StreamFactoryInterface $streamFactory;
@@ -40,6 +44,8 @@ final class HttpClient
     {
         $this->baseUrl = $config->resolveBaseUrl();
         $this->lang = $config->lang;
+        $this->clientId = $config->clientId;
+        $this->clientSecret = $config->clientSecret;
         $this->tokenStore = $config->resolveTokenStore();
         $this->httpClient = $config->httpClient ?? Psr18ClientDiscovery::find();
         $this->requestFactory = $config->requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
@@ -51,19 +57,100 @@ final class HttpClient
      */
     public function request(string $method, string $path, string $auth, ?array $body = null, ?string $lang = null): mixed
     {
+        return $this->send($method, $path, $auth, $body, $lang, false);
+    }
+
+    /** Persist a freshly minted token pair. */
+    public function setTokens(string $accessToken, ?string $refreshToken): void
+    {
+        $this->tokenStore->setToken($accessToken);
+        if ($this->tokenStore instanceof RefreshTokenStore) {
+            $this->tokenStore->setRefreshToken($refreshToken);
+        } else {
+            $this->fallbackRefreshToken = $refreshToken;
+        }
+    }
+
+    public function getRefreshToken(): ?string
+    {
+        return $this->tokenStore instanceof RefreshTokenStore
+            ? $this->tokenStore->getRefreshToken()
+            : $this->fallbackRefreshToken;
+    }
+
+    public function clearTokens(): void
+    {
+        $this->fallbackRefreshToken = null;
+        $this->tokenStore->clear();
+    }
+
+    /** Force a refresh using the stored refresh token. Throws on failure. */
+    public function refresh(): void
+    {
+        if (!$this->tryRefresh()) {
+            throw new AuthenticationException(
+                'Token refresh failed',
+                new ApiErrorContext(httpStatus: 401, method: 'POST', path: '/general/refreshApi'),
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $body
+     */
+    private function send(string $method, string $path, string $auth, ?array $body, ?string $lang, bool $isRetry): mixed
+    {
         [$status, $envelope, $response] = $this->dispatch($method, $path, $auth, $body, $lang);
 
         if ($status >= 200 && $status < 300 && ($envelope['resultType'] ?? null) === 0) {
             return $envelope['data'] ?? null;
         }
 
-        // A revoked token is worth forgetting; an expired one is not, since the
-        // caller may want to inspect it while installing a replacement.
+        $expired = $status === 401 || ($envelope['resultType'] ?? null) === 4;
+        if ($auth === 'partner' && $expired && !$isRetry && $this->tryRefresh()) {
+            return $this->send($method, $path, $auth, $body, $lang, true);
+        }
+
+        // A revoked session is worth forgetting; a merely expired access token is
+        // not, since the caller may want to inspect it.
         if (($envelope['resultType'] ?? null) === 2) {
-            $this->tokenStore->clear();
+            $this->clearTokens();
         }
 
         throw $this->toException($method, $path, $status, $envelope, $response);
+    }
+
+    private function tryRefresh(): bool
+    {
+        $refreshToken = $this->getRefreshToken();
+        if ($refreshToken === null || $refreshToken === '' || $this->clientId === null || $this->clientSecret === null) {
+            return false;
+        }
+
+        try {
+            [$status, $envelope] = $this->dispatch('POST', '/general/refreshApi', 'public', [
+                'refreshToken' => $refreshToken,
+                'clientId' => $this->clientId,
+                'clientSecretKey' => $this->clientSecret,
+            ], null);
+        } catch (TransportException) {
+            return false;
+        }
+
+        $data = $envelope['data'] ?? null;
+        if ($status < 200 || $status >= 300 || ($envelope['resultType'] ?? null) !== 0
+            || !\is_array($data) || !isset($data['access_token']) || !\is_string($data['access_token'])) {
+            $this->clearTokens();
+
+            return false;
+        }
+
+        $newRefresh = isset($data['refresh_token']) && \is_string($data['refresh_token'])
+            ? $data['refresh_token']
+            : $refreshToken;
+        $this->setTokens($data['access_token'], $newRefresh);
+
+        return true;
     }
 
     /**
@@ -89,7 +176,7 @@ final class HttpClient
             if ($token === null || $token === '') {
                 // Dispatching anyway would only come back as an opaque 401.
                 throw new AuthenticationException(
-                    'No partner token configured.',
+                    'No access token available. Call auth->connect(), or construct the client with partnerToken.',
                     new ApiErrorContext(httpStatus: 0, method: $method, path: $path),
                 );
             }

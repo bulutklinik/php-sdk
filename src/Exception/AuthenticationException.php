@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Bulutklinik\Sdk\Exception;
 
-/** 401, a revoked token (resultType 2), or an expired one (resultType 4). */
+/** 401 after a failed or impossible refresh, or a revoked session (resultType 2). */
 final class AuthenticationException extends ApiException
 {
 }

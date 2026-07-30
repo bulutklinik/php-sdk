@@ -147,7 +147,7 @@ it('maps 429 to RateLimitException with retryAfter', function () {
     expect($caught->context->retryAfter)->toBe(30);
 });
 
-it('surfaces an expired token (resultType 4) without retrying', function () {
+it('surfaces an expired token when there is nothing to refresh with', function () {
     $attempts = 0;
     $store = new InMemoryTokenStore('expired');
     [$client] = makeClient(function () use (&$attempts) {
@@ -164,10 +164,9 @@ it('surfaces an expired token (resultType 4) without retrying', function () {
     }
 
     expect($caught)->toBeInstanceOf(AuthenticationException::class);
-    expect($caught->getMessage())->toContain('cannot refresh it');
+    expect($caught->getMessage())->toContain('could not be refreshed');
     expect($attempts)->toBe(1);
-    // An expired token is kept: the caller may want to inspect it while
-    // installing the replacement. Only a revoked one is cleared.
+    // The dead access token is kept; only a revoked session (resultType 2) clears.
     expect($store->getToken())->toBe('expired');
 });
 

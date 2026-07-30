@@ -7,13 +7,13 @@ PHP 8.2+.
 This is a single-persona SDK: every call runs on the company-scoped `/outher`
 surface with the partner token issued for your integration. You act on the
 patients of **your own company**, and the patient is named inline on each
-request — there is no login and no session. See [`DESIGN.md`](./DESIGN.md) for
+request — there is no patient session. See [`DESIGN.md`](./DESIGN.md) for
 the full wire contract.
 
-> **1.0.0 is a breaking release.** The patient persona (login, registration,
-> payments, AI analysis, address book) has been removed and the former
-> `$client->partner->…` namespace was lifted to the client root. See
-> [CHANGELOG.md](./CHANGELOG.md) and DESIGN.md §12 for the migration.
+> **1.1.0 restores `$client->auth`.** 1.0.x wrongly assumed the partner token
+> could only be issued out of band; it is in fact minted by `connectApi` from your
+> portal credentials, and it is refreshable. Existing 1.0.x code that passes
+> `partnerToken:` keeps working. See [CHANGELOG.md](./CHANGELOG.md).
 
 ## Install
 
@@ -38,8 +38,12 @@ use Bulutklinik\Sdk\ApiVersion;
 $client = new BulutklinikClient(new ClientConfig(
     environment: Environment::Production,  // Production | Test | Local
     apiVersion: ApiVersion::V3,            // V3 (default) | V4
-    partnerToken: getenv('BK_PARTNER_TOKEN') ?: null,
+    clientId: getenv('BK_CLIENT_ID') ?: null,
+    clientSecret: getenv('BK_CLIENT_SECRET') ?: null,
 ));
+
+// 0) Log in. Tokens are stored and refreshed for you.
+$client->auth->connect('svc@your-app.bulutklinik', 'your-portal-password');
 
 // 1) Find a doctor you can book
 $result = $client->doctors->search(['withFreeText' => 'kardiyoloji'], 1, ['slot']);
@@ -62,10 +66,11 @@ $client->appointments->create($held['hash'], $held['outherProcessId']);
 
 ## Services
 
-28 endpoints across six groups.
+31 endpoints across seven groups.
 
 | Group                    | Methods |
 |--------------------------|---------|
+| `$client->auth`          | `connect`, `refresh`, `disconnect` |
 | `$client->doctors`       | `search`, `branches`, `detail`, `locations` |
 | `$client->slots`         | `schedule` |
 | `$client->appointments`  | `reserve`, `reserveWithoutAgreement`, `instantReserve`, `create`, `createWithoutSlot`, `cancelWithoutSlot`, `list`, `info`, `checkDoctor` |
@@ -126,47 +131,66 @@ only it.
 
 ## Authentication
 
-The partner token is **issued out of band** through the Bulutklinik Developer
-Platform. It behaves like an API key: there is no login method, and the SDK
-cannot renew it.
-
-The token is read from a token store on **every** request, so a long-running
-process can pick up a newly issued one without being rebuilt. Implement
-`Bulutklinik\Sdk\Token\TokenStore` and pass it via `tokenStore:`:
+Your portal application issues a **client ID**, a **client secret** and a
+project-specific **service identity**; the password is the one you set when
+registering on the portal. `auth->connect()` exchanges them for an access token
+and a refresh token:
 
 ```php
-use Bulutklinik\Sdk\Token\TokenStore;
+$client = new BulutklinikClient(new ClientConfig(clientId: '…', clientSecret: '…'));
 
-final class VaultTokenStore implements TokenStore
+$client->auth->connect(
+    'svc@your-app.bulutklinik',
+    'your-portal-password',
+    loginMode: 'email', // default
+);
+```
+
+The granted scope comes from the credentials, not the request — a partner
+application is provisioned with `apiouther`, which is what makes `/outher`
+reachable. Already holding a token? Pass `partnerToken:` and skip the login.
+
+### Refresh
+
+Access tokens last ~30 days, refresh tokens ~130. You do not normally call
+`refresh()` yourself: on a `401` / `resultType 4` the SDK refreshes once and
+retries the original request.
+
+```php
+$client->auth->refresh();     // only useful to refresh ahead of time
+$client->auth->disconnect();  // revokes both tokens and clears the store
+```
+
+If the refresh fails — or there is no refresh token because you supplied a bare
+`partnerToken` — the call throws `AuthenticationException` and you should
+`auth->connect()` again.
+
+### Token storage
+
+Tokens are read from a token store on **every** request, so a long-running
+process can rotate them without being rebuilt. Implement
+`Bulutklinik\Sdk\Token\RefreshTokenStore` to persist both:
+
+```php
+use Bulutklinik\Sdk\Token\RefreshTokenStore;
+
+final class VaultTokenStore implements RefreshTokenStore
 {
     public function getToken(): ?string { /* … */ }
     public function setToken(?string $token): void { /* … */ }
+    public function getRefreshToken(): ?string { /* … */ }
+    public function setRefreshToken(?string $token): void { /* … */ }
     public function clear(): void { /* … */ }
 }
-
-$client = new BulutklinikClient(new ClientConfig(tokenStore: new VaultTokenStore()));
-
-// …or rotate the default in-memory store in place:
-$client->tokenStore->setToken($newlyIssuedToken);
 ```
 
-Pass `partnerToken:` **or** `tokenStore:`, not both — `ClientConfig` throws
-`InvalidArgumentException` rather than guessing which one you meant.
+The two refresh methods are **optional**. A plain `TokenStore` — the 1.0.x shape,
+access token only — still works; the SDK then keeps the refresh token in memory,
+so a process restart needs `auth->connect()` rather than a refresh.
 
-### When the token expires
-
-Tokens last about 30 days. An expired one comes back as `401` / `resultType 4`;
-the SDK throws `AuthenticationException` and does **not** retry — there is
-nothing to refresh. Recovery is operational: obtain a newly issued token and
-write it into the store.
-
-> This is the one behaviour that changed meaning in 1.0.0. On the patient SDK
-> `resultType 4` meant "the SDK will fix this silently". Here it means the opposite.
-
-An `AuthorizationException` (403) means the credential itself is wrong — either
-the token lacks the `apiouther` scope, or it resolves to a user with no company.
-The company boundary comes from the token, never from request input, so retrying
-with different body parameters will not help.
+An `AuthorizationException` (403) means the credential itself is wrong: either
+the granted scope does not include `apiouther`, or the account has no company.
+The company boundary comes from the token, never from request input.
 
 ## Health measures
 
