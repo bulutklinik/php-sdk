@@ -4,6 +4,56 @@ All notable changes to `bulutklinik/sdk` are documented here. The format is base
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0]
+
+The SDK becomes **partner-only**. Everything that required a patient login is
+gone; the company-scoped `/outher` surface that shipped under `$client->partner`
+in 0.6.0 is now the client root. See `DESIGN.md` §12 for the full migration.
+
+### Changed — BREAKING
+
+- **`$client->partner-><group>` → `$client-><group>`.** The six partner groups
+  (`doctors`, `slots`, `appointments`, `measures`, `laboratory`, `diets`) moved to
+  the root. Their paths, bodies and behaviour are unchanged — this is a rename.
+  Resource classes lost the `Partner` prefix and moved from
+  `Bulutklinik\Sdk\Resource\Partner\` up to `Bulutklinik\Sdk\Resource\`;
+  `PartnerNamespace` is gone.
+- **`TokenStore` now holds one partner token**: `getToken()` / `setToken()` /
+  `clear()` replace `getAccessToken()` / `getRefreshToken()` / `setTokens()`.
+  `InMemoryTokenStore` takes the token as its single constructor argument.
+- **`partnerToken` is now the client's credential** and is required for every
+  call. Passing both `partnerToken:` and `tokenStore:` to `ClientConfig` throws
+  `InvalidArgumentException` rather than silently picking one.
+- **No silent refresh.** A `401` / `resultType 4` throws `AuthenticationException`
+  with no retry — a partner token is issued out of band and cannot be renewed
+  from here. Install a newly issued token in the token store instead.
+- **A missing token fails before dispatch** with `AuthenticationException`, rather
+  than sending an anonymous request that returns an opaque `401`.
+- **Escape hatch `$auth` defaults to `'partner'`**; the `'bearer'` mode no longer
+  exists. `'public'` remains, for unauthenticated endpoints outside the surface.
+- `Environment::baseUrl()` now takes an `ApiVersion` and a new
+  `Environment::apiRoot()` returns the version-less root.
+- `measures->partnerHealthInformation()` → `measures->healthInformation()`.
+- `doctors->search()` signature is now `(array $searchParams, int $currentPage = 1,
+  array $orderParams = [])` — `otherParams` and `perPageLimit` are gone, and
+  `orderParams` no longer accepts `point`.
+
+### Added
+
+- **`ApiVersion` enum** (`V3` / `V4`) and an `apiVersion:` option on
+  `ClientConfig`. Every path is version-agnostic, so targeting v4 is
+  configuration, not a code change. Default stays `V3`.
+- `ClientConfig::resolveTokenStore()`.
+
+### Removed
+
+- `$client->auth` (all 11 methods), `$client->payments` (5), `$client->skin`,
+  `$client->meals`, `$client->addresses` (4) — no company-scoped equivalent exists.
+- The patient-persona `doctors` / `slots` / `appointments` / `measures` /
+  `laboratory` / `diets` that lived at the root in 0.6.0.
+- `clientId` / `clientSecret` on `ClientConfig`.
+- The `LoginResult` class.
+
 ## [0.6.0]
 
 ### Added

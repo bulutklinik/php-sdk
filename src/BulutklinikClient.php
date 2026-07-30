@@ -5,52 +5,49 @@ declare(strict_types=1);
 namespace Bulutklinik\Sdk;
 
 use Bulutklinik\Sdk\Http\HttpClient;
-use Bulutklinik\Sdk\Resource\AddressesResource;
 use Bulutklinik\Sdk\Resource\AppointmentsResource;
-use Bulutklinik\Sdk\Resource\AuthResource;
 use Bulutklinik\Sdk\Resource\DietsResource;
 use Bulutklinik\Sdk\Resource\DoctorsResource;
 use Bulutklinik\Sdk\Resource\LaboratoryResource;
-use Bulutklinik\Sdk\Resource\MealsResource;
 use Bulutklinik\Sdk\Resource\MeasuresResource;
-use Bulutklinik\Sdk\Resource\Partner\PartnerNamespace;
-use Bulutklinik\Sdk\Resource\PaymentsResource;
-use Bulutklinik\Sdk\Resource\SkinResource;
 use Bulutklinik\Sdk\Resource\SlotsResource;
 use Bulutklinik\Sdk\Token\TokenStore;
 
 /**
- * The Bulutklinik API client. Construct once and reuse; service groups are
- * exposed as readonly properties.
+ * The Bulutklinik partner API client. Construct once and reuse; service groups
+ * are exposed as readonly properties.
+ *
+ * Every call runs on the company-scoped `/outher` surface with the partner token
+ * issued for your integration: you act on the patients of **your own company**,
+ * and the patient is named inline on each request — there is no login and no
+ * session.
  *
  * @example
  * $client = new BulutklinikClient(new ClientConfig(
  *     environment: Environment::Test,
- *     clientId: '…',
- *     clientSecret: '…',
+ *     partnerToken: getenv('BK_PARTNER_TOKEN') ?: null,
  * ));
- * $client->auth->connect('patient@example.com', '•••', 'email');
- * $result = $client->doctors->quickSearch('kardiyo');
+ * $branches = $client->doctors->branches();
+ * $latest = $client->measures->last(['identityNumber' => '12345678901']);
  */
 final class BulutklinikClient
 {
-    public readonly AuthResource $auth;
+    /** Doctor discovery: search, branches, detail, city list. */
     public readonly DoctorsResource $doctors;
+    /** Doctor availability (materialized slots). */
     public readonly SlotsResource $slots;
+    /** Reserve, confirm, free-form booking, cancel, list, lookup. */
     public readonly AppointmentsResource $appointments;
-    public readonly PaymentsResource $payments;
+    /** Health measurements for a named patient, read and write. */
     public readonly MeasuresResource $measures;
-    public readonly SkinResource $skin;
-    public readonly MealsResource $meals;
+    /** Lab results for a named patient + the orderable test catalog. */
     public readonly LaboratoryResource $laboratory;
+    /** Diet lists written by a dietitian, for a named patient. */
     public readonly DietsResource $diets;
-    public readonly AddressesResource $addresses;
     /**
-     * The company-scoped partner surface (`/outher`). Uses the configured
-     * `partnerToken` instead of a patient login; data is limited to your own
-     * company and the patient is named inline on each call.
+     * The active token store. Write a newly issued partner token here to rotate
+     * the credential without rebuilding the client.
      */
-    public readonly PartnerNamespace $partner;
     public readonly TokenStore $tokenStore;
 
     private readonly HttpClient $http;
@@ -61,39 +58,34 @@ final class BulutklinikClient
         $this->http = new HttpClient($config);
         $this->tokenStore = $this->http->tokenStore;
 
-        $this->auth = new AuthResource($this->http);
         $this->doctors = new DoctorsResource($this->http);
         $this->slots = new SlotsResource($this->http);
         $this->appointments = new AppointmentsResource($this->http);
-        $this->payments = new PaymentsResource($this->http);
         $this->measures = new MeasuresResource($this->http);
-        $this->skin = new SkinResource($this->http);
-        $this->meals = new MealsResource($this->http);
         $this->laboratory = new LaboratoryResource($this->http);
         $this->diets = new DietsResource($this->http);
-        $this->addresses = new AddressesResource($this->http);
-        $this->partner = new PartnerNamespace($this->http);
     }
 
     /**
      * Escape hatch: call any Bulutklinik API endpoint that does not yet have a
      * typed resource method. The request goes through the same shared transport
      * as the resource methods, so default headers, the chosen `$auth` mode
-     * (`bearer` by default), silent token refresh + retry, envelope unwrapping
-     * and the typed error hierarchy all still apply. Returns the unwrapped
-     * `data` payload. Prefer a typed resource method when one exists.
+     * (`partner` by default), envelope unwrapping and the typed error hierarchy
+     * all still apply. Returns the unwrapped `data` payload. Prefer a typed
+     * resource method when one exists.
      *
-     * @param string                     $method `GET` | `POST` | `PUT` | `DELETE`
-     * @param string                     $path   relative to the base URL, e.g. `/patients/allBranches`
-     * @param string                     $auth   `public` | `bearer` | `partner` (default `bearer`)
-     * @param array<string, mixed>|null  $body   optional JSON payload (omitted on `GET`)
-     * @param string|null                $lang   optional per-request `lang` override
+     * @param string                    $method `GET` | `POST` | `PUT` | `DELETE`
+     * @param string                    $path   relative to the base URL, e.g. `/outher/branches`
+     * @param string                    $auth   `partner` (default) | `public`
+     * @param array<string, mixed>|null $body   optional JSON payload (omitted on `GET`)
+     * @param string|null               $lang   optional per-request `lang` override
      *
      * @example
-     * $branches = $client->request('GET', '/patients/allBranches');
-     * $created = $client->request('POST', '/patients/someNewEndpoint', 'bearer', ['foo' => 'bar']);
+     * $branches = $client->request('GET', '/outher/branches');
+     * // `public` reaches unauthenticated endpoints outside the partner surface
+     * $config = $client->request('GET', '/general/getConfig', 'public');
      */
-    public function request(string $method, string $path, string $auth = 'bearer', ?array $body = null, ?string $lang = null): mixed
+    public function request(string $method, string $path, string $auth = 'partner', ?array $body = null, ?string $lang = null): mixed
     {
         return $this->http->request($method, $path, $auth, $body, $lang);
     }

@@ -14,12 +14,23 @@ class ApiException extends BulutklinikException
 
     /**
      * Map an API failure to the most specific exception type.
-     * Precedence: logout (resultType 2) -> string errorType "validation" -> HTTP status.
+     * Precedence: revoked/expired token (resultType 2 or 4) -> string errorType
+     * "validation" -> HTTP status.
      */
     public static function fromContext(ApiErrorContext $context, string $message): self
     {
         if ($context->resultType === 2) {
             return new AuthenticationException($message, $context);
+        }
+
+        // `resultType 4` used to trigger a silent refresh. On the partner surface
+        // there is nothing to refresh, so say what the caller actually has to do.
+        if ($context->resultType === 4) {
+            return new AuthenticationException(
+                $message . ' The partner token is expired or invalid — install a newly issued token;'
+                . ' the SDK cannot refresh it.',
+                $context,
+            );
         }
 
         $type = \is_string($context->errorType) ? \strtolower($context->errorType) : null;

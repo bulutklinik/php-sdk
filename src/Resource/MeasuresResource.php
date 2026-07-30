@@ -4,78 +4,123 @@ declare(strict_types=1);
 
 namespace Bulutklinik\Sdk\Resource;
 
-/** Health measurements: CRUD, latest, history list, graph and partner submission. */
+/**
+ * Health measurements.
+ *
+ * **Scope:** measurements are written into and read from **your own company**.
+ * Values the patient entered in the Bulutklinik mobile app live in the consumer
+ * tenant and are *not* visible here — that is a consequence of tenant isolation,
+ * not a bug.
+ *
+ * Writes take the full patient shape (`name`, `surname`, `phoneNumber` required;
+ * the patient is created inside your company if absent); reads and edits take the
+ * lighter reference shape (`identityNumber` or `phoneNumber`).
+ */
 final class MeasuresResource extends AbstractResource
 {
     /**
-     * Submit multiple measurements of any types in one call (primary entrypoint).
+     * Most recent value of every measurement type.
      *
-     * @param list<array<string, mixed>> $records
+     * @param array<string, mixed> $patient
      */
-    public function addList(array $records): mixed
+    public function last(array $patient): mixed
     {
-        return $this->http->request('POST', '/patients/addNewUserMeasures', 'bearer', ['data' => $records]);
+        return $this->http->request('POST', '/outher/lastMeasures', 'partner', ['patient' => $patient]);
     }
 
     /**
-     * Submit a single measurement of one type.
+     * Paginated history of one type.
      *
-     * @param array<string, mixed> $fields date_time + the type's own fields
+     * @param array<string, mixed> $patient
      */
-    public function add(string $type, array $fields): mixed
+    public function list(array $patient, string $type, int|string|null $page = null, ?int $glucoseType = null): mixed
     {
-        return $this->http->request('POST', "/patients/addNewUserMeasures/{$type}", 'bearer', $fields);
+        return $this->http->request('POST', "/outher/measuresList/{$type}", 'partner', [
+            'patient' => $patient,
+            'currentPage' => $page,
+            'glucoseType' => $glucoseType,
+        ]);
     }
 
     /**
-     * @param array<string, mixed> $input id + date_time + the type's own fields
-     */
-    public function update(string $type, array $input): mixed
-    {
-        return $this->http->request('PUT', "/patients/updateUserMeasures/{$type}", 'bearer', $input);
-    }
-
-    public function delete(string $type, int|string $id): mixed
-    {
-        return $this->http->request('DELETE', "/patients/deleteUserMeasures/{$type}", 'bearer', ['id' => $id]);
-    }
-
-    /**
-     * Latest value of each measurement type.
+     * Time-bucketed series. `$period`: 1=day, 2=week, 3=month, 4=year.
      *
-     * @return array<array-key, mixed>
+     * @param array<string, mixed> $patient
      */
-    public function last(): array
-    {
-        return $this->asArray($this->http->request('GET', '/patients/measuresList', 'bearer'));
-    }
-
-    /** Paginated history for one type. `glucoseType` (0/1) applies only to glucose. */
-    public function list(string $type, int|string $page, ?int $glucoseType = null): mixed
-    {
-        $path = $glucoseType !== null
-            ? "/patients/userMeasuresList/{$type}/{$page}/{$glucoseType}"
-            : "/patients/userMeasuresList/{$type}/{$page}";
-
-        return $this->http->request('GET', $path, 'bearer');
-    }
-
-    /** Grouped graph data. `period`: 1=day, 2=week, 3=month, 4=year. */
-    public function graph(string $type, int $period, int|string $page, ?int $glucoseType = null): mixed
-    {
-        $path = $glucoseType !== null
-            ? "/patients/userMeasuresGraph/{$type}/{$period}/{$page}/{$glucoseType}"
-            : "/patients/userMeasuresGraph/{$type}/{$period}/{$page}";
-
-        return $this->http->request('GET', $path, 'bearer');
+    public function graph(
+        array $patient,
+        string $type,
+        int $period,
+        int|string|null $page = null,
+        ?int $glucoseType = null,
+    ): mixed {
+        return $this->http->request('POST', "/outher/measuresGraph/{$type}/{$period}", 'partner', [
+            'patient' => $patient,
+            'currentPage' => $page,
+            'glucoseType' => $glucoseType,
+        ]);
     }
 
     /**
-     * Partner (teusan) submission — uses the configured partner token.
+     * Write several measurements of mixed types in one transaction. Max 200 rows.
+     *
+     * @param array<string, mixed>              $patient
+     * @param list<array<string, mixed>>        $data    each row needs `type` plus that type's own fields
+     */
+    public function addList(array $patient, array $data): mixed
+    {
+        return $this->http->request('POST', '/outher/measures', 'partner', [
+            'patient' => $patient,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Write a single measurement.
+     *
+     * @param array<string, mixed> $patient
+     * @param array<string, mixed> $fields  `date_time` plus the type's own fields
+     */
+    public function add(array $patient, string $type, array $fields): mixed
+    {
+        return $this->http->request('POST', "/outher/measure/{$type}", 'partner', ['patient' => $patient] + $fields);
+    }
+
+    /**
+     * Update one measurement row. `$id` comes from `list()`.
+     *
+     * @param array<string, mixed> $patient
+     * @param array<string, mixed> $fields
+     */
+    public function update(array $patient, string $type, int|string $id, array $fields): mixed
+    {
+        return $this->http->request('PUT', "/outher/measure/{$type}", 'partner', ['patient' => $patient, 'id' => $id] + $fields);
+    }
+
+    /**
+     * Delete one measurement row.
+     *
+     * @param array<string, mixed> $patient
+     */
+    public function delete(array $patient, string $type, int|string $id): mixed
+    {
+        return $this->http->request('DELETE', "/outher/measure/{$type}", 'partner', [
+            'patient' => $patient,
+            'id' => $id,
+        ]);
+    }
+
+    /**
+     * Legacy bulk submission for `teusan` integrations.
+     *
+     * @deprecated Requires the `teusan` scope instead of `apiouther`, takes a flat
+     * `identity` + `phoneNumber` instead of `patient`, and writes into the shared
+     * consumer tenant rather than your own company — so the values are not
+     * readable through `last()` / `list()`. Prefer `addList()`.
      *
      * @param list<array<string, mixed>> $data
      */
-    public function partnerHealthInformation(?string $identity, ?string $phoneNumber, array $data): mixed
+    public function healthInformation(?string $identity, ?string $phoneNumber, array $data): mixed
     {
         return $this->http->request('POST', '/outher/healthInformation', 'partner', [
             'identity' => $identity,

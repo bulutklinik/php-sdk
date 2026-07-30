@@ -1,6 +1,6 @@
 {
     "name": "bulutklinik/sdk",
-    "description": "Official Bulutklinik API SDK for PHP",
+    "description": "Official Bulutklinik partner API SDK for PHP",
     "type": "library",
     "license": "MIT",
     "keywords": ["bulutklinik", "sdk", "api", "telemedicine", "health", "appointments", "hbys"],

@@ -4,28 +4,27 @@ declare(strict_types=1);
 
 namespace Bulutklinik\Sdk\Resource;
 
-/** Doctor availability (materialized slots). */
+/** Doctor availability. */
 final class SlotsResource extends AbstractResource
 {
     /**
-     * Fetch a doctor's free slots — returns a date-keyed map of slots. Build the
-     * next step's `appointmentDate` as `"<date> <slotStart>"` (drop the seconds).
+     * Bookable slots for a doctor. Either pass `$scheduleDate`, or page through
+     * with `$scheduleStep` + `$schedulePage`; the server requires one of the two
+     * forms.
      *
-     * @return array<array-key, mixed>
+     * @param string|null $scheduleDate `Y-m-d`
      */
     public function schedule(
         int|string $doctorId,
-        string $listType,
         ?string $scheduleDate = null,
-        int|string $scheduleStep = 7,
-        int|string $schedulePage = 1,
-    ): array {
-        return $this->asArray($this->http->request('POST', '/patients/doctorScheduler', 'bearer', [
+        ?int $scheduleStep = null,
+        ?int $schedulePage = null,
+    ): mixed {
+        return $this->http->request('POST', '/outher/doctorSlots', 'partner', [
             'doctorId' => $doctorId,
             'scheduleDate' => $scheduleDate,
             'scheduleStep' => $scheduleStep,
             'schedulePage' => $schedulePage,
-            'listType' => $listType,
-        ]));
+        ]);
     }
 }

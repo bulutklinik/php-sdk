@@ -4,51 +4,56 @@ declare(strict_types=1);
 
 namespace Bulutklinik\Sdk\Resource;
 
-/** Laboratory: the patient's own results, the orderable test catalog, and test pre-ordering. */
+/**
+ * Laboratory catalogue and results.
+ *
+ * `catalog()` / `catalogDetail()` are global, static package definitions.
+ * `results()` / `resultDetail()` are scoped to your own company and merge two
+ * sources: the clinic's HBYS lab requests and TmcLab order groups. Results
+ * recorded by other clinics are not visible.
+ */
 final class LaboratoryResource extends AbstractResource
 {
-    /**
-     * The patient's completed/in-progress lab results (paginated). `$page`
-     * defaults to 1 server-side when omitted.
-     */
-    public function results(int|string|null $page = null): mixed
-    {
-        $path = $page !== null
-            ? "/patients/userLabTestList/{$page}"
-            : '/patients/userLabTestList';
-
-        return $this->http->request('GET', $path, 'bearer');
-    }
-
-    /**
-     * One result's detail. `$testId` is a **string**: a plain id (`"123"`) or a
-     * TMC-lab id with a `-lab` suffix (`"123-lab"`) — pass it verbatim from a
-     * `results` item.
-     */
-    public function resultDetail(string $testId): mixed
-    {
-        return $this->http->request('GET', "/patients/userLabTestDetail/{$testId}", 'bearer');
-    }
-
-    /** The orderable test-group catalog. */
+    /** Orderable test packages. Static catalogue, no patient context. */
     public function catalog(): mixed
     {
-        return $this->http->request('GET', '/patients/allLaboratoryTests', 'bearer');
+        return $this->http->request('GET', '/outher/laboratoryCatalog', 'partner');
     }
 
-    /** One catalog group by id. */
-    public function catalogDetail(int|string $id): mixed
+    /**
+     * One catalogue package. Prices are the plain list prices — the patient-side
+     * discount pass does not apply here.
+     */
+    public function catalogDetail(int|string $testId): mixed
     {
-        return $this->http->request('GET', "/patients/laboratoryTestDetail/{$id}", 'bearer');
+        return $this->http->request('GET', "/outher/laboratoryCatalog/{$testId}", 'partner');
     }
 
-    /** Pre-order a lab test. Success → `data: { preOrderId }`. */
-    public function order(int|string $testId, int|string $addressId, int|string $laboratoryId): mixed
+    /**
+     * Paginated results — `['foundTestsCount' => int, 'foundTests' => array]`.
+     * Each item's `id` is accepted verbatim by `resultDetail()` (a `-lab` suffix
+     * marks a TmcLab group).
+     *
+     * @param array<string, mixed> $patient
+     */
+    public function results(array $patient, int|string|null $page = null): mixed
     {
-        return $this->http->request('POST', '/patients/addNewLaboratoryTest', 'bearer', [
-            'testId' => $testId,
-            'addressId' => $addressId,
-            'laboratoryId' => $laboratoryId,
+        return $this->http->request('POST', '/outher/laboratoryResults', 'partner', [
+            'patient' => $patient,
+            'currentPage' => $page,
+        ]);
+    }
+
+    /**
+     * One result. Pass the `id` from `results()` unchanged.
+     *
+     * @param array<string, mixed> $patient
+     */
+    public function resultDetail(array $patient, int|string $testId): mixed
+    {
+        return $this->http->request('POST', '/outher/laboratoryResult', 'partner', [
+            'patient' => $patient,
+            'testId' => (string) $testId,
         ]);
     }
 }

@@ -9,7 +9,6 @@ use Bulutklinik\Sdk\Exception\ApiErrorContext;
 use Bulutklinik\Sdk\Exception\ApiException;
 use Bulutklinik\Sdk\Exception\AuthenticationException;
 use Bulutklinik\Sdk\Exception\TransportException;
-use Bulutklinik\Sdk\Token\InMemoryTokenStore;
 use Bulutklinik\Sdk\Token\TokenStore;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Http\Discovery\Psr18ClientDiscovery;
@@ -20,19 +19,19 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
 /**
- * Low-level transport: builds PSR-7 requests, unwraps the response envelope,
- * maps failures to typed exceptions, and performs a single silent token
- * refresh + retry on a 401 / `resultType 4`.
+ * Low-level transport: builds PSR-7 requests, unwraps the response envelope and
+ * maps failures to typed exceptions.
+ *
+ * There is no silent refresh: a partner token is issued out of band and cannot
+ * be renewed from here, so an expired one (`401` / `resultType 4`) surfaces as an
+ * `AuthenticationException` instead of being retried.
  */
 final class HttpClient
 {
     public readonly TokenStore $tokenStore;
-    public readonly ?string $clientId;
-    public readonly ?string $clientSecret;
 
     private readonly string $baseUrl;
     private readonly string $lang;
-    private readonly ?string $partnerToken;
     private readonly ClientInterface $httpClient;
     private readonly RequestFactoryInterface $requestFactory;
     private readonly StreamFactoryInterface $streamFactory;
@@ -41,10 +40,7 @@ final class HttpClient
     {
         $this->baseUrl = $config->resolveBaseUrl();
         $this->lang = $config->lang;
-        $this->clientId = $config->clientId;
-        $this->clientSecret = $config->clientSecret;
-        $this->partnerToken = $config->partnerToken;
-        $this->tokenStore = $config->tokenStore ?? new InMemoryTokenStore();
+        $this->tokenStore = $config->resolveTokenStore();
         $this->httpClient = $config->httpClient ?? Psr18ClientDiscovery::find();
         $this->requestFactory = $config->requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
         $this->streamFactory = $config->streamFactory ?? Psr17FactoryDiscovery::findStreamFactory();
@@ -55,33 +51,14 @@ final class HttpClient
      */
     public function request(string $method, string $path, string $auth, ?array $body = null, ?string $lang = null): mixed
     {
-        return $this->send($method, $path, $auth, $body, $lang, false);
-    }
-
-    /** Force a token refresh using the stored refresh token. Throws on failure. */
-    public function refresh(): void
-    {
-        if (!$this->tryRefresh()) {
-            throw new AuthenticationException('Token refresh failed', new ApiErrorContext(httpStatus: 401));
-        }
-    }
-
-    /**
-     * @param array<string, mixed>|null $body
-     */
-    private function send(string $method, string $path, string $auth, ?array $body, ?string $lang, bool $isRetry): mixed
-    {
         [$status, $envelope, $response] = $this->dispatch($method, $path, $auth, $body, $lang);
 
         if ($status >= 200 && $status < 300 && ($envelope['resultType'] ?? null) === 0) {
             return $envelope['data'] ?? null;
         }
 
-        $expired = $status === 401 || ($envelope['resultType'] ?? null) === 4;
-        if ($auth === 'bearer' && $expired && !$isRetry && $this->tryRefresh()) {
-            return $this->send($method, $path, $auth, $body, $lang, true);
-        }
-
+        // A revoked token is worth forgetting; an expired one is not, since the
+        // caller may want to inspect it while installing a replacement.
         if (($envelope['resultType'] ?? null) === 2) {
             $this->tokenStore->clear();
         }
@@ -107,13 +84,16 @@ final class HttpClient
                 ->withBody($this->streamFactory->createStream($json));
         }
 
-        if ($auth === 'bearer') {
-            $token = $this->tokenStore->getAccessToken();
-            if ($token !== null) {
-                $request = $request->withHeader('Authorization', 'Bearer ' . $token);
+        if ($auth === 'partner') {
+            $token = $this->tokenStore->getToken();
+            if ($token === null || $token === '') {
+                // Dispatching anyway would only come back as an opaque 401.
+                throw new AuthenticationException(
+                    'No partner token configured.',
+                    new ApiErrorContext(httpStatus: 0, method: $method, path: $path),
+                );
             }
-        } elseif ($auth === 'partner' && $this->partnerToken !== null) {
-            $request = $request->withHeader('Authorization', 'Bearer ' . $this->partnerToken);
+            $request = $request->withHeader('Authorization', 'Bearer ' . $token);
         }
 
         try {
@@ -144,37 +124,6 @@ final class HttpClient
         }
 
         return \is_array($decoded) ? $decoded : ['data' => $decoded];
-    }
-
-    private function tryRefresh(): bool
-    {
-        $refreshToken = $this->tokenStore->getRefreshToken();
-        if ($refreshToken === null || $this->clientId === null || $this->clientSecret === null) {
-            return false;
-        }
-
-        try {
-            [$status, $envelope] = $this->dispatch('POST', '/general/refreshApi', 'public', [
-                'refreshToken' => $refreshToken,
-                'clientId' => $this->clientId,
-                'clientSecretKey' => $this->clientSecret,
-            ], null);
-        } catch (TransportException) {
-            return false;
-        }
-
-        $data = $envelope['data'] ?? null;
-        if ($status < 200 || $status >= 300 || ($envelope['resultType'] ?? null) !== 0
-            || !\is_array($data) || !isset($data['access_token'])) {
-            $this->tokenStore->clear();
-
-            return false;
-        }
-
-        $newRefresh = isset($data['refresh_token']) ? (string) $data['refresh_token'] : $refreshToken;
-        $this->tokenStore->setTokens((string) $data['access_token'], $newRefresh);
-
-        return true;
     }
 
     /**

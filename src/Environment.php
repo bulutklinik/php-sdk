@@ -10,12 +10,18 @@ enum Environment: string
     case Test = 'test';
     case Local = 'local';
 
-    public function baseUrl(): string
+    /** API root for this environment. The base URL is `<root>/<apiVersion>`. */
+    public function apiRoot(): string
     {
         return match ($this) {
-            self::Production => 'https://api.bulutklinik.com/api/v3',
-            self::Test => 'https://apitest.bulutklinik.com/api/v3',
-            self::Local => 'https://api-bulutklinik.test/api/v3',
+            self::Production => 'https://api.bulutklinik.com/api',
+            self::Test => 'https://apitest.bulutklinik.com/api',
+            self::Local => 'https://api-bulutklinik.test/api',
         };
+    }
+
+    public function baseUrl(ApiVersion $apiVersion = ApiVersion::V3): string
+    {
+        return $this->apiRoot() . '/' . $apiVersion->value;
     }
 }

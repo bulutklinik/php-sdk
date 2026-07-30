@@ -4,61 +4,53 @@ declare(strict_types=1);
 
 namespace Bulutklinik\Sdk\Resource;
 
-/** Branches, locations, quick/filtered doctor search and doctor detail. */
+/**
+ * Doctor discovery.
+ *
+ * Results are scoped to the doctors enabled for your integration (the server
+ * filters on your partner slug), so a doctor returned here is one you can
+ * actually book.
+ */
 final class DoctorsResource extends AbstractResource
 {
-    /** @return array<array-key, mixed> */
-    public function branches(): array
+    /**
+     * Filtered doctor search.
+     *
+     * @param array<string, mixed> $searchParams
+     * @param list<string>         $orderParams  any of `name`, `order`, `slot`
+     */
+    public function search(array $searchParams, int $currentPage = 1, array $orderParams = []): mixed
     {
-        return $this->asArray($this->http->request('GET', '/patients/allBranches', 'bearer'));
-    }
-
-    /** @return array<array-key, mixed> */
-    public function locations(): array
-    {
-        return $this->asArray($this->http->request('GET', '/patients/allLocations', 'bearer'));
-    }
-
-    /** @return array<array-key, mixed> */
-    public function quickSearch(string $searchText, ?string $listType = null, ?string $location = null): array
-    {
-        return $this->asArray($this->http->request('POST', '/patients/quickSearch', 'bearer', [
-            'searchText' => $searchText,
-            'listType' => $listType,
-            'location' => $location,
-        ]));
+        return $this->http->request('POST', '/outher/search', 'partner', [
+            'searchParams' => $searchParams,
+            'orderParams' => $orderParams,
+            'currentPage' => $currentPage,
+        ]);
     }
 
     /**
-     * @param array<string, mixed> $searchParams
-     * @param list<string>         $orderParams
-     * @param list<string>         $otherParams
+     * Branches available through your integration.
      *
      * @return array<array-key, mixed>
      */
-    public function search(
-        array $searchParams = [],
-        array $orderParams = [],
-        array $otherParams = [],
-        int $currentPage = 1,
-        int $perPageLimit = 20,
-    ): array {
-        return $this->asArray($this->http->request('POST', '/patients/filteredSearch', 'bearer', [
-            'searchParams' => $searchParams,
-            'orderParams' => $orderParams,
-            'otherParams' => $otherParams,
-            'currentPage' => $currentPage,
-            'perPageLimit' => $perPageLimit,
-        ]));
+    public function branches(): array
+    {
+        return $this->asArray($this->http->request('GET', '/outher/branches', 'partner'));
     }
 
-    /** @return array<array-key, mixed> */
-    public function detail(int|string $id, int|string|null $corporate = null): array
+    /** Detail of a single doctor. */
+    public function detail(int|string $doctorId): mixed
     {
-        $path = $corporate !== null
-            ? "/patients/doctorDetail/{$id}/{$corporate}"
-            : "/patients/doctorDetail/{$id}";
+        return $this->http->request('GET', "/outher/doctorInfos/{$doctorId}", 'partner');
+    }
 
-        return $this->asArray($this->http->request('GET', $path, 'bearer'));
+    /**
+     * City list. Global catalogue — not scoped to your company.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function locations(): array
+    {
+        return $this->asArray($this->http->request('GET', '/outher/locations', 'partner'));
     }
 }

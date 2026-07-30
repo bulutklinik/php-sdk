@@ -4,34 +4,25 @@ declare(strict_types=1);
 
 namespace Bulutklinik\Sdk\Token;
 
-/** In-memory token store (default). Tokens live for the lifetime of the object. */
+/** In-memory token store (default). The token lives for the lifetime of the object. */
 final class InMemoryTokenStore implements TokenStore
 {
-    public function __construct(
-        private ?string $accessToken = null,
-        private ?string $refreshToken = null,
-    ) {
+    public function __construct(private ?string $token = null)
+    {
     }
 
-    public function getAccessToken(): ?string
+    public function getToken(): ?string
     {
-        return $this->accessToken;
+        return $this->token;
     }
 
-    public function getRefreshToken(): ?string
+    public function setToken(?string $token): void
     {
-        return $this->refreshToken;
-    }
-
-    public function setTokens(string $accessToken, ?string $refreshToken): void
-    {
-        $this->accessToken = $accessToken;
-        $this->refreshToken = $refreshToken;
+        $this->token = $token;
     }
 
     public function clear(): void
     {
-        $this->accessToken = null;
-        $this->refreshToken = null;
+        $this->token = null;
     }
 }
