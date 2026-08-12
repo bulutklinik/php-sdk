@@ -9,9 +9,10 @@ use Bulutklinik\Sdk\LoginResult;
 /**
  * Token lifecycle.
  *
- * The Developer Platform issues a **client id**, a **client secret** and a
- * project-specific **service identity** per approved application; the password is
- * the one set when registering on the portal. `connect()` exchanges those for an
+ * The Developer Platform issues a **client id**, a **client secret**, a
+ * project-specific **service identity** and an **application password** per approved
+ * application. The password belongs to that application only — it is not the
+ * developer's portal account password. `connect()` exchanges those for an
  * access + refresh token pair, which every other method on the client then uses.
  *
  * Neither `connect()` nor `refresh()` is partner-authenticated: they are the two
