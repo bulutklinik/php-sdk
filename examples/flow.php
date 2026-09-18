@@ -42,7 +42,7 @@ echo 'slots: ' . json_encode($schedule, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICO
 $user = [
     'name' => 'Ada',
     'surname' => 'Lovelace',
-    'phoneNumber' => getenv('BK_PATIENT_PHONE') ?: '+905551112233',
+    'phoneNumber' => getenv('BK_PATIENT_PHONE') ?: '+90 5551112233',
     'identityNumber' => getenv('BK_PATIENT_TCKN') ?: null,
 ];
 

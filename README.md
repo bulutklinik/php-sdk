@@ -57,7 +57,7 @@ $slot = reset($schedule)[0];
 $held = $client->appointments->reserveWithoutAgreement($slot['slotId'], $doctorId, [
     'name' => 'Ada',
     'surname' => 'Lovelace',
-    'phoneNumber' => '+905551112233',
+    'phoneNumber' => '+90 5551112233',
 ]);
 
 // 4) Confirm before $held['reservationExpired'] passes
@@ -89,7 +89,7 @@ and never creates anything:
 
 ```php
 $client->measures->last(['identityNumber' => '12345678901']);
-$client->diets->list(['phoneNumber' => '+905551112233']);
+$client->diets->list(['phoneNumber' => '+90 5551112233']);
 ```
 
 `identityNumber` is primary; `phoneNumber` is a fallback accepted only when it
@@ -102,7 +102,7 @@ company if absent:
 
 ```php
 $client->measures->addList(
-    ['name' => 'Ada', 'surname' => 'Lovelace', 'phoneNumber' => '+905551112233'],
+    ['name' => 'Ada', 'surname' => 'Lovelace', 'phoneNumber' => '+90 5551112233'],
     [['type' => 'pulse', 'date_time' => '2026-06-17 09:31', 'pulse' => 72]],
 );
 ```
